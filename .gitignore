@@ -1,0 +1,17 @@
+# game data / archives -- never commit these
+*.xp3
+*.xp3.sig
+*.dll
+*.wmv
+*.asf
+*.wav
+*.caf
+*.pck
+*.exe
+
+# the game's own key table, read at runtime via --filter
+xp3filter.tjs
+
+# python
+__pycache__/
+*.pyc
