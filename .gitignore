@@ -15,3 +15,7 @@ xp3filter.tjs
 # python
 __pycache__/
 *.pyc
+
+# 编译产物（源码在 tools/mac/）
+tools/mac/winlist
+tools/mac/wclick

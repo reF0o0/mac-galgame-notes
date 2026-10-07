@@ -1,4 +1,16 @@
-# 排查过程原始记录
+# 案例：《千恋＊万花》ED 黑屏的排查过程
+
+这是本仓库的起点，也是最深的一个案例。
+
+**结论摘要**：ED 动画黑屏是三层问题叠加，任何一层没解决都看不到画面 ——
+(1) dyld 顶替 `libiconv` 把 Wine 里的 GStreamer 打崩；
+(2) `krmovie.dll` 文件偏移 `0x20B6` 处有 12 个字节，把影片挡在 `layer`
+渲染模式之外；(3) ED 的音轨是 Wine 解不了的 WMA Pro。
+
+工具在 [tools/xp3/](../tools/xp3/)，格式细节在
+[kirikiri-xp3-format.md](kirikiri-xp3-format.md)。
+
+---
 
 按时间顺序记，包括走错的路 —— 那些弯路对后来人可能比结论更有用。
 
