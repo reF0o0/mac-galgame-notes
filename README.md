@@ -111,8 +111,9 @@ open "$SIKA_APP"
 | 3D / 新引擎的作品花屏或纯色 | 渲染后端选错 | 在 D9VK / DXVK / D3DMetal 之间换着试 |
 | Electron 打包的游戏纯白 | Wine 下跨进程 GPU 传不过去 | `Program Flags` 加 `--in-process-gpu --no-sandbox` |
 | 插了耳机还是外放 | Wine 在**启动时**枚举音频设备并绑死 | 先插耳机，再启动游戏 |
-| 存档读不进去，无限弹错误框 | 引擎对存档做哈希校验，别人的存档对不上 | 把旧存档移走，重开一局 |
+| 存档读不进去，无限弹错误框 | 引擎对存档做哈希校验，别人的存档对不上 | 把旧存档移走，重开一局；见 [08-saves.md](docs/08-saves.md) |
 | 改了 `.xp3` 但游戏没变化 | KiriKiri 在启动时就把归档打开并缓存了 | 完全退出游戏再开 |
+| 装完游戏/补丁后磁盘少了好几个 G | 解压中间产物、winetricks 缓存、容器快照没清 | 见 [09-disk-and-cleanup.md](docs/09-disk-and-cleanup.md) |
 
 ## 实测过的游戏
 
@@ -141,6 +142,9 @@ docs/03-container-tuning.md          Info.plist 全键位说明、渲染后端�
 docs/04-troubleshooting.md           症状 -> 根因 -> 修法，含验证手段
 docs/05-observed-games.md            7 部作品的实测配置与踩坑记录
 docs/06-toolbox.md                   调试工具链说明
+docs/07-steam.md                     正版 Steam 路线：平台字段、steamcmd、库文件挪出容器
+docs/08-saves.md                     存档位置、备份、字节比对回滚、外来存档能不能用
+docs/09-disk-and-cleanup.md          磁盘占用实测、容器快照、缓存清理、完整卸载
 docs/case-senren-banka-ed.md         案例：《千恋＊万花》ED 黑屏的三层根因
 docs/kirikiri-xp3-format.md          KiriKiri 的 XP3 容器格式与本项目用到的写入策略
 
