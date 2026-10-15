@@ -106,6 +106,7 @@ open "$SIKA_APP"
 |---|---|---|
 | 文字全是方块 □□□ | 游戏指定了 Wine 里没有的字体（汉化版常指定微软雅黑） | 在 `HKCU\Software\Wine\Fonts\Replacements` 里做字体替换 |
 | 影片黑屏 / 白屏，游戏本身正常 | 影片编码 Wine 解不了，或引擎的 DirectShow 链路没建起来 | 把影片转成 WMV2；同时排掉 VC-1 |
+| 只有某一段影片卡住，别的都正常 | 那一段的**音轨**是 Wine 解不了的 WMA Pro（`avdec_wmapro`） | 只重封装那一段：`-c:v copy -c:a wmav2`，见 [case-atri-ed](docs/case-atri-ed.md) |
 | 一进游戏就崩，崩溃地址像野指针 | 引擎在 DirectShow 协商失败后自己踩空 | 同上——换影片编码，别去补解码器 |
 | 启动后纯白，CPU 只有几个点 | 卡在建图 / 卡在等影片播完，不是"慢" | 先看日志里有没有 `video mode:layer`；见排查文档 |
 | 3D / 新引擎的作品花屏或纯色 | 渲染后端选错 | 在 D9VK / DXVK / D3DMetal 之间换着试 |
@@ -146,6 +147,7 @@ docs/07-steam.md                     正版 Steam 路线：平台字段、steamc
 docs/08-saves.md                     存档位置、备份、字节比对回滚、外来存档能不能用
 docs/09-disk-and-cleanup.md          磁盘占用实测、容器快照、缓存清理、完整卸载
 docs/case-senren-banka-ed.md         案例：《千恋＊万花》ED 黑屏的三层根因
+docs/case-atri-ed.md                 案例：ATRI 片尾卡住 + 无密钥表时怎么量 CX 密钥流
 docs/kirikiri-xp3-format.md          KiriKiri 的 XP3 容器格式与本项目用到的写入策略
 
 tools/mac/build.sh                   编译 winlist / wclick
@@ -158,9 +160,11 @@ tools/mac/launcher.applescript       给上面那个后端套 GUI
 
 tools/xp3/xp3tool.py                 XP3 读取（索引链、条目、解压）
 tools/xp3/cxdec.py                   CX 加密/解密（密钥表从游戏自带脚本读）
+tools/xp3/cx_seal.py                 没有密钥表时，从密文量出密钥流并回写
 tools/xp3/xp3_replace.py             最小改动替换一个条目（自动回写加密）
 tools/xp3/krmovie_nop12.py           本仓库发现的 12 字节补丁，一键完成
 tools/xp3/verify.py                  回读校验：解密每个条目并打印 md5 / 类型
+tools/xp3/verify_swap.py             换片专用回读校验（只动了一个条目 + 哈希对得上）
 ```
 
 ## 环境

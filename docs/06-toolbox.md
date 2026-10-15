@@ -127,22 +127,34 @@ python3 tools/xp3/xp3tool.py list game/patch.xp3                 # 看有哪些�
 python3 tools/xp3/verify.py game/patch.xp3 --filter "$FILTER"    # 全量回读校验
 python3 tools/xp3/xp3_replace.py ...                             # 替换一个条目
 python3 tools/xp3/krmovie_nop12.py game/patch.xp3 --filter "$FILTER" --backup
+
+# 游戏没带 xp3filter.tjs 时（ATRI），密钥流只能量不能算
+python3 tools/xp3/cx_seal.py probe game/vol1.xp3 206 明文.wmv
+python3 tools/xp3/cx_seal.py seal  game/vol1.xp3 206 新明文.wmv 新密文.bin 明文.wmv
+python3 tools/xp3/xp3_replace.py game/vol1.xp3 206 新密文.bin --no-encrypt
+python3 tools/xp3/verify_swap.py game/vol1.xp3 备份/vol1.xp3 206 新明文.wmv
 ```
 
 | 脚本 | 作用 |
 |---|---|
 | `xp3tool.py` | 读归档：索引链、条目列表、单个条目解压 |
 | `cxdec.py` | CX 加密/解密。密钥表从游戏自带的 `xp3filter.tjs` 读 |
+| `cx_seal.py` | 没有 `xp3filter.tjs` 时，**从密文本身量出** (k1, seam, k2) 并回写 |
 | `xp3_replace.py` | **最小改动**替换一个条目，自动按条目自己的 `aldr` 回写加密 |
 | `krmovie_nop12.py` | 那个 12 字节补丁，自己在归档里找 DLL、定位签名、原地改 |
 | `verify.py` | 回读校验：把每个条目解密后打印 md5 和类型 |
+| `verify_swap.py` | 换片专用回读校验：只有目标条目的索引字段变了 + 解密后哈希对得上 |
 
-**两条铁律**：
+**三条铁律**：
 
 1. **不要重建归档。** 只改那一个条目的偏移和大小，数据区一个字节不动，
    新内容追加到文件尾部。重建索引会让游戏直接打不开归档。
 2. **CX 的密钥流是位置相关的**，所以不能直接改密文 —— 必须用条目自己的
    `aldr` 重新加密一遍。`xp3_replace.py` 做的就是这个。
+3. **没带 `xp3filter.tjs` 就量，别套公式。** ATRI 的 `vol1.xp3` 里
+   `(aldr & 0x134) + 0x736` 这条边界公式 5 个影片命中 4 个，第 5 个（就是那段
+   出问题的 ED）是例外。`cx_seal.py` 从两处已知 ASF GUID + 全文件一致性校验
+   反推密钥，见 [case-atri-ed.md](case-atri-ed.md)。
 
 格式细节见 [kirikiri-xp3-format.md](kirikiri-xp3-format.md)。
 

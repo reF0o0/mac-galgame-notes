@@ -92,6 +92,20 @@ UI / Main Text / Sub Text 三栏都选简体中文再确定。以后想改，窗
 「(Those bugs are fixed upstream in Wine 9.0)」，发布的也只有 Linux 的 `.so`，
 macOS 被官方标为 not recommended。**结论是不用装。**
 
+### 片尾影片卡死（已修）
+
+结局那段影片（`vol1.xp3` 条目 206，4:22）一播就黑屏卡住，CPU 掉到 2%，
+连续截图逐字节相同。原因是这段的音轨是 **WMA Pro**，Wine 的 libav
+（`avdec_wmapro`）解不了；同目录另外四部影片（1:38 的 OP 一类）音轨是 `wmav2`，
+所以只有这一段落网。
+
+修法：只重封装音轨（`-c:v copy -c:a wmav2 -b:a 192k`），按条目自己的
+keystream 重新加密，`xp3_replace.py` 追加式替换。完整过程（含这份归档
+没有 `xp3filter.tjs`、密钥只能量不能算）见
+[case-atri-ed.md](case-atri-ed.md)。
+
+顺带一条经验：这部作品的片子条目名是哈希，认不出片名，**时长是最好用的指纹**。
+
 ---
 
 ## アマカノ3
