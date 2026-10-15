@@ -24,9 +24,10 @@ import xp3tool  # noqa: E402
 
 
 def fields(e):
-    s = e["segs"][0]
-    return (e["name"], e["orgsize"], e["arcsize"], e["aldr"],
-            len(e["segs"]), s["flags"], s["start"], s["orgsize"], s["arcsize"])
+    """Everything in the index entry that decides what the engine reads."""
+    return (e["name"], e["hash"], e["flags"], e["orgsize"], e["arcsize"],
+            e["aldr"], tuple((s["flags"], s["start"], s["orgsize"], s["arcsize"])
+                             for s in e["segs"]))
 
 
 def main():

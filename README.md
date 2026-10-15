@@ -155,12 +155,14 @@ tools/mac/winlist.c                  列出屏幕上的窗口 + 窗口号（截�
 tools/mac/wclick.swift               合成鼠标点击 / 按键
 tools/mac/wraptry.sh                 启动容器 -> 等 -> 精确截它的窗口
 tools/mac/guest-env.sh               source 一下，拿到容器里的 wine 环境
+tools/mac/gst-env.sh                 source 一下，拿容器的 GStreamer 验"这个影片能不能解"
+tools/mac/match_media.py             验游戏放的到底是哪个影片：画面相关度 / 音轨互相关
 tools/mac/galgame-menu.sh            多游戏启动后端
 tools/mac/launcher.applescript       给上面那个后端套 GUI
 
 tools/xp3/xp3tool.py                 XP3 读取（索引链、条目、解压）
 tools/xp3/cxdec.py                   CX 加密/解密（密钥表从游戏自带脚本读）
-tools/xp3/cx_seal.py                 没有密钥表时，从密文量出密钥流并回写
+tools/xp3/cx_seal.py                 没有密钥表时，从密文量出密钥流（解密 / 回写）
 tools/xp3/xp3_replace.py             最小改动替换一个条目（自动回写加密）
 tools/xp3/krmovie_nop12.py           本仓库发现的 12 字节补丁，一键完成
 tools/xp3/verify.py                  回读校验：解密每个条目并打印 md5 / 类型

@@ -9,8 +9,10 @@ keystream 重新加密、用追加式替换写回归档，就通了。
 意外发现，见阶段 3：`(aldr & 0x134) + 0x736` 这条边界公式在这份归档里
 **5 个影片命中 4 个，条目 206 是例外**。所以规则是「先测量，再下结论」。
 
-工具在 [tools/xp3/](../tools/xp3/)：`cx_seal.py`（测量并回写 keystream）、
-`xp3_replace.py`（追加式替换）、`verify_swap.py`（回读校验）。
+工具：[tools/xp3/](../tools/xp3/) 的 `cx_seal.py`（量 keystream / 解密 / 回写）、
+`xp3_replace.py`（追加式替换）、`verify_swap.py`（回读校验），
+[tools/mac/](../tools/mac/) 的 `gst-env.sh`（拿容器的 GStreamer 验编码）、
+`match_media.py`（验"放的到底是哪一部"）。
 
 ---
 
@@ -18,7 +20,7 @@ keystream 重新加密、用追加式替换写回归档，就通了。
 
 结局那段影片一开始播放就黑屏卡死。两个非像素信号就够定性：
 
-- 进程 CPU 从头到尾 ~2%（正常放片时 20–40%）；
+- 进程 CPU 掉到 ~2%（放片时是几十个百分点，这台机器上实测 40–90%，含渲染）；
 - 隔几秒截两张图，**字节级完全相同** —— 画面没在动。
 
 这和千恋那次一模一样。所以第一步不是猜缺解码器，而是先确认"到底哪一段数据
@@ -26,18 +28,20 @@ keystream 重新加密、用追加式替换写回归档，就通了。
 
 ## 阶段 1：五部影片，只有一部不一样
 
-`vol1.xp3` 里有 5 个影片条目（文件名是哈希，认不出来，只能按大小和内容类比）：
+`vol1.xp3` 里有 5 个影片条目。文件名是哈希，认不出片名，但按大小一眼就能挑出来
+（第 6 大的条目只有 11 MB，和这几部差一个量级）：
 
 | 条目 | 明文大小 | 时长 | 音轨 | 视频 |
 |---|---|---|---|---|
-| 206 | 158,890,876 | **262.661 s** | **wmapro** 440 kb/s | wmv3 1280x720 |
-| 207 | 192,784,179 | 98.033 s | wmav2 | wmv3 1280x720 |
-| 208 | 192,772,259 | 98.033 s | wmav2 | wmv3 1280x720 |
-| 209 | 192,748,419 | 98.033 s | wmav2 | wmv3 1280x720 |
-| 210 | 192,760,339 | 98.033 s | wmav2 | wmv3 1280x720 |
+| 206 | 158,890,876 | **262.661 s** | **wmapro** 440 kb/s | wmv3 1280x720 @5.0 Mb/s |
+| 207 | 192,784,179 | 98.033 s | wmav2 309 kb/s | wmv3 1280x720 @15.4 Mb/s |
+| 208 | 192,772,259 | 98.033 s | wmav2 309 kb/s | wmv3 1280x720 @15.4 Mb/s |
+| 209 | 192,748,419 | 98.033 s | wmav2 309 kb/s | wmv3 1280x720 @15.4 Mb/s |
+| 210 | 192,760,339 | 98.033 s | wmav2 309 kb/s | wmv3 1280x720 @15.4 Mb/s |
 
 **时长是对照组**：206 是那段 4:22 的片尾，其余四部都是 1:38（OP 一类）。
 片子卡在第 4 分钟、其他影片正常，问题就锁在 206 上。
+（码率也说明 206 是被单独处理过的一段：别人 15.4 Mb/s，它只有 5.0 Mb/s。）
 
 顺带排除的两条路（都走了，都否定掉了）：
 
@@ -53,7 +57,7 @@ keystream 重新加密、用追加式替换写回归档，就通了。
 所以永远显示"文件没问题"）。要用游戏真正会用到的那套栈：
 
 ```bash
-source work/gstenv.sh          # 指向 ATRI.app 里的 GStreamer.framework
+source tools/mac/gst-env.sh ATRI      # 把容器自己的 GStreamer 环境导入当前 shell
 GST_DEBUG=2 "$GSTLAUNCH" -q filesrc location=X.wmv ! decodebin ! fakesink
 ```
 
@@ -74,9 +78,22 @@ GST_DEBUG=2 "$GSTLAUNCH" -q filesrc location=X.wmv ! decodebin ! fakesink
 于是换个方向：**从密文本身量**。ASF 的前 16 字节是固定的 Header GUID、
 DataObject 处是固定的 GUID，两处一 XOR 就得到两个密钥；剩下只有"从哪里切换"。
 
-量出来的结论是：**整份 158,890,876 字节的 keystream 恰好是两个常量段**，
-在 seam 处从 k1 换成 k2，没有第三个值、没有一个例外字节
-（用 big-int XOR 全文件比对，`diff == k1*seam + k2*(n-seam)` 逐字节成立）。
+顺序是这样的：
+
+1. **k1**：密文前 16 字节 `^` ASF Header GUID（这 16 字节落在第一个段里，
+   所以直接得到 k1）。
+2. **k2**：明文里 DataObject 的位置由头部的 `hsize` 给出，拿 `hsize` 处的
+   16 字节密文 `^` DataObject GUID，得到 k2。两处都是 16 字节全等才认。
+3. **seam**：找一个**跨片共有的已知明文**。五部片子的 ASF 头部里都有同一个对象
+   （GUID `1806d474-cadf-4509-a4ba-9aabcb96aae8`），206 里它从 `0x37f` 开始、
+   其余四部从 `0x266` 开始。这个对象的 16 字节 GUID 五部完全相同，而 206 的密文里
+   **GUID 的前 14 个字节要用 k1 才还原得出来，后 2 个字节（`aa e8`，从另外四部
+   知道的值）只有用 k2 才对得上** —— 切换点只能卡在这两者之间，也就是 `0x38d`。
+4. **确认**：按 (k1, seam, k2) 把整份文件解出来，`diff = C^P` 在全文件范围内
+   **全等于 `k1*seam + k2*(n-seam)`** —— 两个常量段，没有第三个值、没有一个
+   例外字节；解出来的明文又能被 ffmpeg 干净地 demux + 解码。这一步不含糊：
+   把 seam 换成公式算出来的 `0x75a`，解出来的文件 ffprobe 立刻报
+   `Invalid data found when processing input`。
 
 同一模型套到另外四部片子上，5/5 成立：
 
@@ -93,25 +110,35 @@ DataObject 处是固定的 GUID，两处一 XOR 就得到两个密钥；剩下�
 重新封装过（汉化补丁重打包？不同版本的素材？）。**原因没查清，但不影响修
 —— 测量出来的 seam 是字节级精确的。**
 
-seam 怎么证明到字节级：五部片子共用同一个**厂商对象**（`asfdemux` 会读到它），
-206 里它在 `0x37f`，其余四部在 `0x266`。206 那 14 个字节要 `k2`，而它前一个
-字节是 `0x01`（= k1）—— 切换点只能落在 `0x38d`。
-
-**坑**：`atri_decode.py` 那种"按公式算 seam"的脚本对 206 是错的；校验太松的
-脚本也会放过它。要写就写成"验证 diff 全等于两段常量，否则报错"。
+**坑**：按公式算 seam 的脚本对 206 会算出 `0x75a`，改成用它解，坏掉的正好是
+`0x38d`–`0x759` 这 973 字节 —— ASF 头里的 Stream Properties / metadata 全在
+里面，所以文件当场就废。看着"好发现"，但前提是你去验了"解出来的东西能不能解"：
+这次是**因为要把音轨单独取出来看编码**，才逼到这一步。
+校验要写成"`C^P` 全等于两段常量，否则报错"，而不是"看起来像样就行"。
 
 ## 阶段 4：修法
 
 ```bash
+# 0. 先解出原条目（密钥只靠密文，seam 靠那个跨片共有的锚点 —— 见阶段 3）
+ANCHOR=0x37f:74d40618dfca0945a4ba9aabcb96aae8      # 从 m207 的 0x266 抄过来
+python3 tools/xp3/cx_seal.py probe   vol1.xp3 206 --anchor $ANCHOR
+python3 tools/xp3/cx_seal.py decrypt vol1.xp3 206 m206.wmv --anchor $ANCHOR
+
 # 1. 只换音轨，视频流原封不动（所以画质无损）
 ffmpeg -y -i m206.wmv -c:v copy -c:a wmav2 -b:a 192k -ar 44100 -ac 2 m206.fix.wmv
 
-# 2. 用从原条目量出来的 (k1, seam, k2) 把它封回密文
+# 2. 用同一组 (k1, seam, k2) 把它封回密文
 python3 tools/xp3/cx_seal.py seal vol1.xp3 206 m206.fix.wmv m206.fix.enc m206.wmv
 
 # 3. 追加式替换：数据追加到尾部，只改索引里的偏移和一个指针
 python3 tools/xp3/xp3_replace.py vol1.xp3 206 m206.fix.enc --no-encrypt
+
+# 4. 回读校验：只有 206 变了 + 解密回去哈希对得上
+python3 tools/xp3/verify_swap.py vol1.xp3 vol1.xp3.orig 206 m206.fix.wmv
 ```
+
+（每一步之前备份：`cp -c vol1.xp3 vol1.xp3.orig` —— APFS 上 `-c` 是写时复制，
+1.6 GB 的档不额外占盘。）
 
 第 3 步用 `--no-encrypt` 是因为第 2 步已经自己封过密文了 —— 这条路径走的
 正是千恋那边的教训：**追加式替换是唯一不会把归档写坏的改法**，全量重建索引
@@ -134,28 +161,35 @@ python3 tools/xp3/xp3_replace.py vol1.xp3 206 m206.fix.enc --no-encrypt
    非像素信号：连续截图不再逐字节相同（每秒都在变）。
 
 第 3 层里"放的确实是条目 206"这件事也是量出来的，不靠眼看：
-把游戏画面按窗口内的影片区域裁出来，和每部影片逐帧做归一化相关——
+把游戏画面按窗口内的影片区域裁出来，和每部影片逐帧做归一化相关
+（`tools/mac/match_media.py frame <截图> <影片...>`）：
 
 ```
-m206.wmv  best corr 0.958 at t=40.5s
-m207.wmv  best corr 0.464
-m208.wmv  best corr 0.464
+crop y0=48 x0=-4 (pre-score 0.935)
+m206.wmv             best corr 0.958 at t=40.5s
+m207.wmv             best corr 0.456 at t=39.5s
+m208.wmv             best corr 0.456 at t=39.5s
 ```
 
-（脚本见 `work/match_movie.py`：先粗扫裁剪偏移，再按 1 fps 全片比对。）
+（窗口装饰占多少不写死，先粗扫裁剪偏移；帧率 1 fps 全片比对，一张 4:22 的片子
+十几秒跑完。）
 
 **音轨单独验一遍**：换音轨是这次改动的全部内容，所以不能只看画面。
 把原版和修好版都解成 PCM 再比（宿主机 ffmpeg 解原版的 wmapro 没问题，
-这里量的是"内容一样不一样"，不是"能不能解"）：
+这里量的是"内容一样不一样"，不是"能不能解"）
+（`tools/mac/match_media.py audio <a> <b>`）：
 
 ```
-t=  5s corr 0.924   t=120s corr 0.878   t=240s corr 0.915
-每次都是恒定 lag -372 samples（-46.5 ms）
+2097598 samples compared (262.2 s)
+  a rms=  5188.1 peak= 28993
+  b rms=  5188.9 peak= 28047
+best corr 0.902 at lag -372 samples (-46.5 ms)
+envelope (100 ms) corr 0.930
 ```
 
 也就是同一段音乐，只是**整体提前了 46.5 ms**（重封装时编码器延时换算的结果，
 开头静音长度也从 1261 ms 变成 1213 ms）。这个量级在唇音同步容差之内，不用管；
-但知道它存在比"没测"强。
+但知道它存在比"没测"强。分段量过，全程都是同一个 lag，不是漂移。
 
 ## 复盘
 

@@ -65,6 +65,28 @@ grep -A5 winecoreaudio "$WINEPREFIX/user.reg"
 `GST_PLUGIN_PATH`、`VK_DRIVER_FILES`、`LANG`）是从容器自己的启动脚本里反推的。
 **少一个就会加载错 dylib**，症状是各种奇怪的崩溃 —— 所以不要手敲，用这个脚本。
 
+### `gst-env.sh` —— 用容器的解码器说话
+
+```bash
+source tools/mac/gst-env.sh ATRI
+GST_DEBUG=2 "$GSTLAUNCH" -q filesrc location=x.wmv ! decodebin ! fakesink
+```
+
+判断"这个影片文件到底能不能放"**必须**这么跑。宿主机自己的 ffmpeg 自带完整
+libav，能解 Wine 解不了的东西（WMA Pro 就是典型），拿它当判据永远显示"文件
+没问题"。变量和 `guest-env.sh` 同源，只是额外导出 `GSTLAUNCH` / `GSTINSPECT`。
+
+### `match_media.py` —— 确认游戏放的到底是哪一个文件
+
+```bash
+python3 tools/mac/match_media.py frame /tmp/shot.png a.wmv b.wmv   # 画面
+python3 tools/mac/match_media.py audio a.wmv b.wmv                 # 声音
+```
+
+`frame` 把截图里的影片裁出来跟每部候选片逐帧比相关度（放的那部 0.9x，别的
+0.4x 上下）；`audio` 把两条音轨解成 PCM 互相关，同时给出"内容一样"和"有没有
+恒定偏移"。换完影片之后用这个，比"我看了/我听了"硬。
+
 ### `galgame-menu.sh` —— 多游戏启动后端
 
 见 [02-install-game.md](02-install-game.md)。配 `launcher.applescript` 就有
@@ -129,8 +151,9 @@ python3 tools/xp3/xp3_replace.py ...                             # 替换一个�
 python3 tools/xp3/krmovie_nop12.py game/patch.xp3 --filter "$FILTER" --backup
 
 # 游戏没带 xp3filter.tjs 时（ATRI），密钥流只能量不能算
-python3 tools/xp3/cx_seal.py probe game/vol1.xp3 206 明文.wmv
-python3 tools/xp3/cx_seal.py seal  game/vol1.xp3 206 新明文.wmv 新密文.bin 明文.wmv
+python3 tools/xp3/cx_seal.py probe   game/vol1.xp3 206 --anchor 0x37f:74d40618...
+python3 tools/xp3/cx_seal.py decrypt game/vol1.xp3 206 明文.wmv --anchor 0x37f:74d40618...
+python3 tools/xp3/cx_seal.py seal    game/vol1.xp3 206 新明文.wmv 新密文.bin 明文.wmv
 python3 tools/xp3/xp3_replace.py game/vol1.xp3 206 新密文.bin --no-encrypt
 python3 tools/xp3/verify_swap.py game/vol1.xp3 备份/vol1.xp3 206 新明文.wmv
 ```
@@ -139,7 +162,7 @@ python3 tools/xp3/verify_swap.py game/vol1.xp3 备份/vol1.xp3 206 新明文.wmv
 |---|---|
 | `xp3tool.py` | 读归档：索引链、条目列表、单个条目解压 |
 | `cxdec.py` | CX 加密/解密。密钥表从游戏自带的 `xp3filter.tjs` 读 |
-| `cx_seal.py` | 没有 `xp3filter.tjs` 时，**从密文本身量出** (k1, seam, k2) 并回写 |
+| `cx_seal.py` | 没有 `xp3filter.tjs` 时，**从密文本身量出** (k1, seam, k2)：解密 / 回写。seam 靠 `--anchor` 给的已知明文钉住 |
 | `xp3_replace.py` | **最小改动**替换一个条目，自动按条目自己的 `aldr` 回写加密 |
 | `krmovie_nop12.py` | 那个 12 字节补丁，自己在归档里找 DLL、定位签名、原地改 |
 | `verify.py` | 回读校验：把每个条目解密后打印 md5 和类型 |
