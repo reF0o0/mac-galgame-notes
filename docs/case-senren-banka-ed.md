@@ -96,7 +96,7 @@ NOP 掉这 12 个字节 → 日志立刻出现 `video mode:layer` + `layerResize
 先确认了归档本身能被工具正常解析、索引链完整、条目密文也能解出合法 MP4 ——
 说明坏的不是数据，而是"引擎不接受的布局"。
 
-于是换成最小改动方案（`docs/xp3-format-notes.md`）：数据区不动，
+于是换成最小改动方案（[kirikiri-xp3-format.md](kirikiri-xp3-format.md)）：数据区不动，
 内容追加到尾部，只改条目偏移和一个指针。改完第一次跑通：
 
 ```

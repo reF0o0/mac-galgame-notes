@@ -31,7 +31,8 @@ galgame，以及一路上踩过的坑、用过的工具、每个坑的根因和�
 | 引擎 / 来源 | 特征 | 建议路线 |
 |---|---|---|
 | **Ren'Py** | 目录里有 `game/`、`*.rpyc` | 官方就有 Mac 版；只有 Windows 版时用 Ren'Py SDK 直接跑，不用 Wine |
-| **KiriKiri / KiriKiriZ** | 一堆 `*.xp3`，exe 里有 `TVP*` 符号 | Wine 封装最成熟的组合，本仓库主线 |
+| **KiriKiri / KiriKiriZ** | 一堆 `*.xp3`，exe 里有 `TVPWindowForm` / `tTVP` 符号（只搜 `TVP` 会误报） | Wine 封装最成熟的组合，本仓库主线 |
+| **Artemis Engine** | `*.pfs`（文件头是 `pf8`），exe 里有 `Artemis Engine` / `luabind` 字样 | 同样用 Wine；D3D9 的老作品开 `D9VK`，D3D11 的新作品靠 wine-10 的 wined3d |
 | **NScripter / ONS** | `nscript.dat`、`*.nsa` | OnscripterYuri 有原生 mac 构建 |
 | **Unity / RPG Maker / 自研** | `*_Data/`、`Game.exe` | Wine；3D 的另算 |
 | **带 DRM 的**（DMM/FANZA 客户端、SoftDenchi、PlayDRM） | 启动时要联网校验 | Wine 上大概率翻车，考虑虚拟机 |
@@ -118,17 +119,19 @@ open "$SIKA_APP"
 
 ## 实测过的游戏
 
-同一台机器上装完并验证能玩到正片的 7 部，配置各不相同——这张表本身就是
-"为什么不能照抄一份配置"的最好说明。
+同一台机器上装完、至少进到标题画面的 7 部，配置各不相同——这张表本身就是
+"为什么不能照抄一份配置"的最好说明。其中只有千恋＊万花和 ATRI 是逐段玩过、
+影片段落也实机验证过的；其余 5 部的影片只做了编码层面的核查，见
+[docs/05-observed-games.md](docs/05-observed-games.md) 各节的标注。
 
 | 游戏 | 引擎 | 容器引擎 | 关键开关 | 主要坑 |
 |---|---|---|---|---|
 | 千恋＊万花 | KiriKiri Z | WineCX 24.0.7 | `MOLTENVKCX=1` | 字体乱码、影片黑屏 |
 | ATRI -My Dear Moments- | KiriKiri Z | wine-10.0 | `MOLTENVKCX=1` | 首启语言对话框 |
-| アマカノ3 | `.pfs` + E-mote | wine-10.0 | `D9VK=1` | 强制 D3D11，旧引擎跑不起来 |
+| アマカノ3 | Artemis Engine（`.pfs` + E-mote） | wine-10.0 | `D9VK=1`（实测未生效，见 05） | 强制 D3D11，旧引擎跑不起来 |
 | 不败世界与终焉之花 | KiriKiri Z | wine-10.0 | `D9VK=1` | 汉化重打包造成的文件名编码错误 |
-| 灵感满溢的甜蜜创想 | KiriKiri Z | wine-10.0 | `D9VK=1` + 原生 quartz | 片头 VC-1 导致启动即崩 |
-| 可塑性记忆 | KiriKiri 系 | wine-10.0 | `D9VK=1` | 默认 OpenGL 后端只出蓝/黑屏 |
+| 灵感满溢的甜蜜创想 | Artemis Engine（`.pfs`） | wine-10.0 | `D9VK=1` + 原生 quartz | 片头 VC-1 导致启动即崩 |
+| 可塑性记忆 | M2 引擎（PSB + Squirrel） | wine-10.0 | `D9VK=1` | 默认 OpenGL 后端只出蓝/黑屏 |
 | 与奴隶的生活 | Electron + TyranoScript | wine-10.0 | `DXVK=1` + `--in-process-gpu` | 白屏；存档哈希校验 |
 
 详见 [docs/05-observed-games.md](docs/05-observed-games.md)。
@@ -159,6 +162,7 @@ tools/mac/gst-env.sh                 source 一下，拿容器的 GStreamer 验"
 tools/mac/match_media.py             验游戏放的到底是哪个影片：画面相关度 / 音轨互相关
 tools/mac/galgame-menu.sh            多游戏启动后端
 tools/mac/launcher.applescript       给上面那个后端套 GUI
+tools/mac/cdp.py                     走 Chrome DevTools 协议调试 Electron 系作品
 
 tools/xp3/xp3tool.py                 XP3 读取（索引链、条目、解压）
 tools/xp3/cxdec.py                   CX 加密/解密（密钥表从游戏自带脚本读）
@@ -190,6 +194,9 @@ tools/xp3/verify_swap.py             换片专用回读校验（只动了一个�
 - **带 DRM 的正版**（DMM/FANZA 客户端、SoftDenchi、PlayDRM）：本仓库没试，
   路线那一节只给了"考虑虚拟机"的方向。
 - **性能**：2D 文字游戏不吃 GPU，所以这里没做帧率对比；3D 作品会不一样。
+- **影片段落的实机验证**：只有千恋＊万花和 ATRI 逐段玩到过影片；其余几部
+  只做了编码层面的核查（能排除"解不了"，排除不了"不出画"）。见
+  [05-observed-games.md](docs/05-observed-games.md) 的附录。
 
 如果你补了其中任何一块，欢迎按 `docs/` 里的格式加一节——每节都是
 「症状 / 根因 / 怎么验证 / 怎么修」四段，照抄那个结构就行。
