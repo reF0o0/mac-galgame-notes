@@ -130,7 +130,7 @@ open "$SIKA_APP"
 | ATRI -My Dear Moments- | KiriKiri Z | wine-10.0 | `MOLTENVKCX=1` | 首启语言对话框 |
 | アマカノ3 | Artemis Engine（`.pfs` + E-mote） | wine-10.0 | `D9VK=1`（实测未生效，见 05） | 强制 D3D11，旧引擎跑不起来 |
 | 不败世界与终焉之花 | KiriKiri Z | wine-10.0 | `D9VK=1` | 汉化重打包造成的文件名编码错误 |
-| 灵感满溢的甜蜜创想 | Artemis Engine（`.pfs`） | wine-10.0 | `D9VK=1` + 原生 quartz | 片头 VC-1 导致启动即崩 |
+| 灵感满溢的甜蜜创想 | Artemis Engine（`.pfs`） | wine-10.0 | `D9VK=1`（未生效，见 05）+ 原生 quartz / LAV | 片头 VC-1 导致启动即崩；影片"能播没画面" |
 | 可塑性记忆 | M2 引擎（PSB + Squirrel） | wine-10.0 | `D9VK=1` | 默认 OpenGL 后端只出蓝/黑屏 |
 | 与奴隶的生活 | Electron + TyranoScript | wine-10.0 | `DXVK=1` + `--in-process-gpu` | 白屏；存档哈希校验 |
 

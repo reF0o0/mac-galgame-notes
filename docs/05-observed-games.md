@@ -218,8 +218,10 @@ Shift-JIS。
 ## 灵感满溢的甜蜜创想
 
 - **引擎**：**Artemis Engine**，不是 KiriKiri（复核更正，见下）。
-  **容器**：wine-10.0，`D9VK=1`（这部确实需要：它导入的是 `d3d9.dll`），
-  prefix 里装了原生 `quartz`（winetricks 记录 `wsh57` + `quartz`）。
+  **容器**：wine-10.0。Info.plist 里写着 `D9VK=1` / `CNC_DDRAW=1`，但
+  **两个都没生效**，实际跑的是 Wine 内置的 `d3d9`（见坑四）。prefix 里装了
+  原生 `quartz`（winetricks 的 `wsh57` + `quartz`）和 LAV Filters 0.74.1
+  （x86 + x64 都注册了）。
 
 ### 复核（2026-10-16）：它是 Artemis Engine，不是 KiriKiri Z
 
@@ -263,6 +265,81 @@ cp omt2rs7.dat omt2rs7.wmv
 **修法**：`logo.wmv` 转成 WMV2（166 KB 变 612 KB，内容一样）；`omt2rs7.wmv`
 直接用补丁包里现成的 WMV2 版本，比转码干净。
 
+### 坑三：容器根本起不来 —— `users/` 里一条悬空的软链接
+
+**症状**：双击容器报错退出，什么都起不来：
+
+```
+ERROR: The file "crossover" couldn't be saved in the folder "users"
+because a file with the same name already exists.
+```
+
+**根因**：`prefix/drive_c/users/` 下有一条**悬空**的软链接
+`crossover -> Sikarugir`，而它指向的 `Sikarugir/` 目录根本不存在
+（建瓶那一刻链接建出来了、目录没建）。启动时包装器要再建这条链接，
+一看名字被占就整个失败。
+
+**验证**：
+
+```bash
+U="$APP/Contents/SharedSupport/prefix/drive_c/users"
+ls -la "$U"            # crossover 是软链接，readlink 出来是 Sikarugir
+ls -d "$U/Sikarugir"   # No such file or directory → 悬空
+```
+
+对照一个正常的瓶子（千恋）`users/` 里应该是：一个真目录 `Sikarugir/`，
+外加 `crossover -> Sikarugir` 和 `fanre -> Sikarugir` 两条链接。
+
+**修法**：把这条坏链接**挪走**（挪，别删，留着好对账），下次启动就正常了。
+
+```bash
+mv "$U/crossover" /tmp/crossover.symlink.bak
+```
+
+挪走之后冷启动一次，实测能一路跑到标题画面（2026-10-16），
+START / CONTINUE / LOAD / CONFIG / SPECIAL / EXIT 都在。
+瓶子里的 `fanre/` 是游戏自己建/用的，**别手动动**。
+
+### 坑四：`D9VK` / `CNC_DDRAW` 这两个开关改了等于没改
+
+**症状**：Info.plist 写着 `D9VK=1`、`CNC_DDRAW=1`，但游戏实际用的还是
+Wine 自带的 `d3d9`（走 wined3d/OpenGL），**没有**走 Vulkan。
+所以"把 `D9VK` 关掉看 OP 会不会出画"这类实验，在这台容器上做不出任何区别。
+
+**怎么看出来**（四条，互相独立）：
+
+```bash
+APP="$HOME/Applications/Sikarugir/灵感满溢的甜蜜创想.app"
+
+# 1) 启动环境里只有 WINEDLLPATH_*，没有 WINEDLLOVERRIDES
+ps eww -p $(pgrep -f "灵感满溢.*wineserver" | head -1) | tr ' ' '\n' | grep WINEDLL
+
+# 2) 注册表里没有 d3d9 / ddraw 的 override，而且这一节从 10-06 起没再被写过
+sed -n '/DllOverrides/,/^\[/p' "$APP/Contents/SharedSupport/prefix/user.reg"
+
+# 3) 瓶子里那份 d3d9.dll 是 Wine 自带的大小
+ls -l "$APP/Contents/SharedSupport/prefix/drive_c/windows/syswow64/d3d9.dll"
+# 200704 B ← Wine 自带的；d9vk 那两份是 4160911 / 3948351 B，没被拷进来
+
+# 4) 10-06 那次带 +loaddll 的日志里也是 builtin
+grep -a "d3d9.dll" "$APP/Contents/Logs/LastRunWine.log"
+# Loaded L"C:\windows\system32\d3d9.dll" at 7A590000: builtin
+```
+
+第 2 条那次查到的时间戳是 **2026-10-06 17:18**（也就是装 winetricks 那次），
+今天（10-16）两次启动容器都没往那一节里添东西。作为对照，千恋的瓶子里
+反而明确写了 `"d3d9"="builtin"`。
+
+**结论**：开关只让包装器导出一个 `WINEDLLPATH_D9VK` 之类的环境变量，
+**没有**往瓶子里写 dll override，Wine 于是照旧加载内置的 `d3d9` / `ddraw`。
+`CNC_DDRAW=1` 同理：日志里那句 `fixme:ddraw:ddraw7_Initialize` 就是 Wine
+内置 ddraw 打的，真的加载了 cnc-ddraw 不会有这行。
+
+**没搞清的地方**：这些开关是不是只在**建容器那一刻**才写进瓶子 ——
+证据是 `DXVK=0` 的几个 Sep-23 瓶子里照样躺着一份 4.2 MB 的 DXVK
+`d3d11.dll`。想让 `D9VK` 真跑起来，要么手工补 override，要么重建一个容器，
+**这两条都没试过**。
+
 ### 遗留
 
 影片能"播"（占满片长再继续剧情），但**画面在 Wine 下画不出来**，那几秒是白屏，
@@ -278,9 +355,13 @@ cp omt2rs7.dat omt2rs7.wmv
   纹理上，这条路在 Wine 下没走通（类似千恋那个"没有 `video mode:layer`
   就没有人出画"的形状，但成因不同）。
 
-下一步值得试的（都还没做）：把 `D9VK` 关掉、退回 wined3d/OpenGL 再放一次 OP
-（D3D9→Vulkan 的纹理路径对格式更挑）；不行再试 `D3DMETAL=1`。
-**改 Info.plist 前先关掉游戏。**
+原来打算先试的"关掉 `D9VK`、退回 wined3d 再放一次 OP"**作废**：这台容器上
+`D9VK` 根本没生效，`d3d9` 一直是 Wine 内置的 wined3d（坑四），关它等于什么都没改。
+剩下值得试的是 `D3DMETAL=1`。**改 Info.plist 前先关掉游戏。**
+
+2026-10-16 的实机复核只走到**标题画面 + 开头几分钟剧情**（点 START → 一段黑屏
+过场 → 卧室对话），**没有触发 OP**。所以"白屏"这条还是玩家原来的记录，
+既没被复现、也没被推翻；要取证得真的点到影片那一段再截图。
 
 ---
 
@@ -425,8 +506,12 @@ source tools/mac/gst-env.sh <容器名>
 - **アマカノ3 的 `D9VK=1` 是误归因**：它只用 D3D11，日志里 d3d11 / d3d9
   都是 `builtin`，真正起作用的是 wine-10.0 的 wined3d。
 - **不败世界的 OP / ED 音轨是 `wmav2`**，且不需要 krmovie 那 12 字节补丁。
-- **灵感满溢"能播没画面"**：两个片子都 `rc=0`，编码是通的，
-  问题在渲染层；下一步试关 `D9VK`。
+- **灵感满溢"能播没画面"**：两个片子都 `rc=0`，编码是通的，问题在渲染层。
+  原计划"关 `D9VK` 再放一次"**作废** —— 这台容器的 `D9VK=1` / `CNC_DDRAW=1`
+  压根没写进瓶子，`d3d9` 一直是 Wine 内置（见该节坑四）。
+- **顺手修掉一个容器启动缺陷**：灵感满溢的 `prefix/drive_c/users/` 里有一条
+  悬空软链接 `crossover -> Sikarugir`，会让容器直接起不来（见该节坑三）。
+  修完之后冷启动能正常到标题画面，这条是实机验证过的。
 - **可塑性记忆**的 prefix 里躺着一份笔记没记过的 LAVFilters 0.74.1；
   它的影片是 H.264 + AAC，编码能解，但"开机就播的 `PM_bootMV` 经不经得起
   Wine 的 DirectShow 链"没验过。
@@ -437,5 +522,6 @@ source tools/mac/gst-env.sh <容器名>
 1. アマカノ3 / 不败世界 / 灵感满溢 / 可塑性记忆 的**影片过场**有没有正常出画。
    静态核查只能排除"编码解不了"，排除不了"渲染层不出画"（灵感满溢就是后者）。
 2. 把 アマカノ3 的 `D9VK` 关掉会不会有别的副作用（理论上不会，没实测）。
-3. 灵感满溢 关 `D9VK` / 开 `D3DMETAL` 能不能让 OP 出画。
+3. 灵感满溢 开 `D3DMETAL=1` 能不能让 OP 出画（"关 `D9VK`" 这条已作废，
+   见该节坑四）。
 4. 可塑性记忆 的开机影片在 Wine 下到底走不走得通。

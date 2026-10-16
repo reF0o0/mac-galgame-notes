@@ -65,6 +65,35 @@ cp "$PLIST" "$PLIST.bak-$(date +%Y%m%d)"                   # 改之前先备份
 - `Frameworks/renderer/` 下面有什么目录，就说明这个容器支持哪些后端。
   `WINEDLLPATH` 里要列上对应的 `wine` 子目录，否则模块加载不到。
 
+### 这些开关不一定生效
+
+本机实测（2026-10-16）：`Info.plist` 里的 `D9VK` / `CNC_DDRAW` 只是让包装器
+导出一个 `WINEDLLPATH_*` 环境变量，**没有**往瓶子里写 dll override，于是
+Wine 继续用自己内置的 `d3d9` / `ddraw` —— 改了等于没改。
+
+改了开关先查这三处，别急着下"换后端没用"的结论：
+
+```bash
+APP="$HOME/Applications/Sikarugir/某容器.app"
+PREFIX="$APP/Contents/SharedSupport/prefix"
+
+ps eww -p $(pgrep -f "某容器.*wineserver" | head -1) | tr ' ' '\n' | grep WINEDLL
+sed -n '/DllOverrides/,/^\[/p' "$PREFIX/user.reg"
+grep -a "d3d9.dll" "$APP/Contents/Logs/LastRunWine.log"
+```
+
+第二条里期望看到 `"d3d9"="native"` 这类条目，第三条期望是 `native` 而不是
+`builtin`。三处都指向内置实现，就说明这个开关在这个瓶子里不起作用：
+要么手工往 `user.reg` 补 override，要么另建一个容器，别怀疑游戏。
+
+两个附带的坑：
+
+- `LastRunWine.log` **不是每次运行都会写**。2026-10-16 的两次启动都是
+  `pkill` + `wineserver -k` 关的，一份日志都没留下，文件还是 10-06 那次的。
+  想留证据就让容器正常退出，或者换个方式抓日志。
+- 同一个瓶子里 `DXVK` 的 `d3d11.dll` 是**模板自带**的：`DXVK=0` 的容器
+  system32 里照样躺着 4.2 MB 那两份，别拿"文件在不在"当开关生效的证据。
+
 ## `Program Flags`：命令行参数
 
 有些引擎会读启动参数，比改游戏文件干净得多。本机用到的：
