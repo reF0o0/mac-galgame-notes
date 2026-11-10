@@ -121,8 +121,10 @@ open "$SIKA_APP"
 
 同一台机器上装完、至少进到标题画面的 7 部，配置各不相同——这张表本身就是
 "为什么不能照抄一份配置"的最好说明。其中只有千恋＊万花和 ATRI 是逐段玩过、
-影片段落也实机验证过的；其余 5 部的影片只做了编码层面的核查，见
+影片段落也实机验证过的；其余作品的验证范围见
 [docs/05-observed-games.md](docs/05-observed-games.md) 各节的标注。
+《灵感满溢的甜蜜创想》另补了 2026-11-10 剧情中白屏的现场与恢复记录，
+但尚未重新完整播放出问题的 OP。
 
 | 游戏 | 引擎 | 容器引擎 | 关键开关 | 主要坑 |
 |---|---|---|---|---|
@@ -130,7 +132,7 @@ open "$SIKA_APP"
 | ATRI -My Dear Moments- | KiriKiri Z | wine-10.0 | `MOLTENVKCX=1` | 首启语言对话框 |
 | アマカノ3 | Artemis Engine（`.pfs` + E-mote） | wine-10.0 | `D9VK=1`（实测未生效，见 05） | 强制 D3D11，旧引擎跑不起来 |
 | 不败世界与终焉之花 | KiriKiri Z | wine-10.0 | `D9VK=1` | 汉化重打包造成的文件名编码错误 |
-| 灵感满溢的甜蜜创想 | Artemis Engine（`.pfs`） | wine-10.0 | `D9VK=1`（未生效，见 05）+ 原生 quartz / LAV | 片头 VC-1 导致启动即崩；影片"能播没画面" |
+| 灵感满溢的甜蜜创想 | Artemis Engine（`.pfs`） | wine-10.0 | `D9VK=1`（未生效，见 05）；已安装 LAV，当前 `*quartz=builtin` | 片头 VC-1 导致启动即崩；剧情中白屏重启后恢复，OP 重放待验 |
 | 可塑性记忆 | M2 引擎（PSB + Squirrel） | wine-10.0 | `D9VK=1` | 默认 OpenGL 后端只出蓝/黑屏 |
 | 与奴隶的生活 | Electron + TyranoScript | wine-10.0 | `DXVK=1` + `--in-process-gpu` | 白屏；存档哈希校验 |
 
