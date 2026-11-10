@@ -221,7 +221,8 @@ Shift-JIS。
   **容器**：wine-10.0。Info.plist 里写着 `D9VK=1` / `CNC_DDRAW=1`，但
   **两个都没生效**，实际跑的是 Wine 内置的 `d3d9`（见坑四）。prefix 里装了
   原生 `quartz`（winetricks 的 `wsh57` + `quartz`）和 LAV Filters 0.74.1
-  （x86 + x64 都注册了）。
+  （x86 + x64 都注册了）。**2026-11-10 起该容器的 `*quartz` override 已改为
+  `builtin`**，安装过原生 DLL 不代表当前仍在加载它，见下方恢复记录。
 
 ### 复核（2026-10-16）：它是 Artemis Engine，不是 KiriKiri Z
 
@@ -342,8 +343,9 @@ grep -a "d3d9.dll" "$APP/Contents/Logs/LastRunWine.log"
 
 ### 遗留
 
-影片能"播"（占满片长再继续剧情），但**画面在 Wine 下画不出来**，那几秒是白屏，
-点一下可以跳过。用纯红影片做过标记测试，确认是真没渲染，不是截图问题。
+此前记录过影片占满片长后继续剧情、期间白屏，也曾可点击跳过。用纯红影片做过
+标记测试，确认当时没有显示影片画面。**2026-11-10 又出现了点击和 Esc 均无法
+退出影片的白屏**，详见下方记录，不能把点击跳过当作通用处理方法。
 
 复核时补的两条事实：
 
@@ -362,6 +364,54 @@ grep -a "d3d9.dll" "$APP/Contents/Logs/LastRunWine.log"
 2026-10-16 的实机复核只走到**标题画面 + 开头几分钟剧情**（点 START → 一段黑屏
 过场 → 卧室对话），**没有触发 OP**。所以"白屏"这条还是玩家原来的记录，
 既没被复现、也没被推翻；要取证得真的点到影片那一段再截图。
+
+### 恢复记录（2026-11-10）：剧情中白屏，有声音，点击无反应
+
+**症状与现场**：此前剧情正常，玩到一段剧情后变成白屏；玩家反馈仍有声音，
+点击无反应。现场 `lsof` 确认进程仍打开 `movie/omt2rs7.wmv`（OP），
+尝试 Esc 也没有退出影片。这次未更换影片、游戏程序或图形后端。
+
+**备份**：修改前将 `savedata_cn/`、容器的 `Info.plist`、
+`user.reg`、`system.reg`、`userdef.reg` 备份到游戏目录下的
+`.repair-backup-20261110-113220/`。备份仅保留在本机，不提交存档或游戏资源。
+
+**本次操作**：原注册表为 `*quartz=native,builtin`。结束卡住的游戏进程后，
+临时用 `WINEDLLOVERRIDES='*quartz=b'` 启动，并开启 `+loaddll` 核对。
+日志确认：
+
+```text
+Loaded L"C:\\windows\\syswow64\\quartz.dll" ... : builtin
+```
+
+注意这里的 **`*quartz` 有星号**：本次先只设 `quartz=b` 时，日志仍然显示
+加载 `native`；改用 `*quartz=b` 后才确认是 `builtin`。以日志为准。
+
+重启后进入标题界面，随后恢复到存档剧情，玩家确认“现在好了”。之后将设置
+保存到该游戏容器，查询确认 `*quartz REG_SZ builtin`：
+
+```bash
+# 在仓库根目录执行，只针对这一个游戏容器。
+source tools/mac/guest-env.sh 灵感满溢的甜蜜创想
+"$WINE" reg add 'HKCU\Software\Wine\DllOverrides' \
+  /v '*quartz' /t REG_SZ /d builtin /f
+"$WINE" reg query 'HKCU\Software\Wine\DllOverrides' /v '*quartz'
+```
+
+本次在游戏继续运行时写入该设置；它用于后续启动，不会替换当前进程已加载的 DLL。
+**下一次通过普通启动器冷启动是否沿用成功，尚未再次实测。**
+
+如需恢复原 override，先退出游戏，再在同一容器环境中执行：
+
+```bash
+"$WINE" reg add 'HKCU\Software\Wine\DllOverrides' \
+  /v '*quartz' /t REG_SZ /d 'native,builtin' /f
+```
+
+**结论与限制**：已确认切换为内置 quartz 后重启能恢复标题界面和存档剧情，
+并已保存注册表设置。但**没有重新完整播放此前卡住的 OP**，也没有在同一 OP
+上完成原生 / 内置 quartz 的往返对照；重启本身也可能影响结果。因此不能将本次
+记录写成“已证实原生 quartz 是根因”或“OP 白屏彻底修复”。后续验证应覆盖同一
+影片正常出画、播放结束后继续剧情，以及普通启动器的冷启动。
 
 ---
 
